@@ -65,3 +65,23 @@ def user_logout(request):
             return Response({'message': 'Successfully logged out.'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
+        
+# accounts/views.py
+
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_required_intake(request):
+    user = request.user
+    required_intake = request.data.get('required_intake')
+
+    if required_intake is not None:
+        user.required_intake = required_intake
+        user.save()
+        return Response({'message': 'Required intake updated successfully.'}, status=status.HTTP_200_OK)
+    
+    return Response({'error': 'Required intake not provided.'}, status=status.HTTP_400_BAD_REQUEST)
