@@ -26,3 +26,23 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+
+class FoodIntake(models.Model):
+      
+        MEAL_TIMES = [
+        ('breakfast', 'Breakfast'),
+        ('lunch', 'Lunch'),
+        ('dinner', 'Dinner'),
+        ('snack', 'Snack'),
+    ]
+        
+        user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+        calories = models.FloatField()
+        carbs = models.FloatField()
+        protein = models.FloatField()
+        meal_time = models.CharField(max_length=10, choices=MEAL_TIMES) 
+        fat = models.FloatField()
+        date = models.DateField(auto_now_add=True)
+
+        def __str__(self):
+          return f"{self.food_name} by {self.user.username} on {self.date}"

@@ -2,6 +2,7 @@
 
 from rest_framework import serializers
 from .models import CustomUser
+from .models import FoodIntake
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -25,3 +26,8 @@ class UserSerializer(serializers.ModelSerializer):
         user.required_intake = user.calculate_required_intake()
         user.save()
         return user
+class FoodIntakeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FoodIntake
+        fields = ['date', 'meal_time', 'calories', 'carbs', 'protein', 'fat']
+        read_only_fields = ['user']

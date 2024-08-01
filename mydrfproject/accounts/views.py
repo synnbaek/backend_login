@@ -85,3 +85,53 @@ def update_required_intake(request):
         return Response({'message': 'Required intake updated successfully.'}, status=status.HTTP_200_OK)
     
     return Response({'error': 'Required intake not provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+# views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import FoodIntake
+from .serializers import FoodIntakeSerializer
+from django.db.models import Sum
+from rest_framework.permissions import IsAuthenticated
+
+class FoodIntakeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        serializer = FoodIntakeSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            
+            # 날짜를 기준으로 누적된 섭취량 계산
+            date = request.data.get('date')
+            meal_time = request.data.get('meal_time')
+
+            total_intake = FoodIntake.objects.filter(
+                user=request.user,
+                date=date
+            ).values(
+                'meal_time'
+            ).annotate(
+                total_calories=Sum('calories'),
+                total_carbs=Sum('carbs'),
+                total_protein=Sum('protein'),
+                total_fat=Sum('fat')
+            )
+
+            daily_totals = FoodIntake.objects.filter(
+                user=request.user,
+                date=date
+            ).aggregate(
+                total_calories=Sum('calories'),
+                total_carbs=Sum('carbs'),
+                total_protein=Sum('protein'),
+                total_fat=Sum('fat')
+            )
+            
+            return Response({
+                'meal_totals': total_intake,
+                'daily_totals': daily_totals
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
