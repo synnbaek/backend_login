@@ -66,6 +66,24 @@ def user_logout(request):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)   
         
+
+
+# accounts/views.py
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import UserSerializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_profile(request):
+    user = request.user
+    serializer = UserSerializer(user)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+        
 # accounts/views.py
 
 from rest_framework import status
@@ -106,20 +124,19 @@ class FoodIntakeView(APIView):
             
             # 날짜를 기준으로 누적된 섭취량 계산
             date = request.data.get('date')
-            meal_time = request.data.get('meal_time')
 
-            total_intake = FoodIntake.objects.filter(
+            # 식사 종류별로 영양섭취량 누적 계산
+            meal_totals = FoodIntake.objects.filter(
                 user=request.user,
                 date=date
-            ).values(
-                'meal_time'
-            ).annotate(
+            ).values('meal_time').annotate(
                 total_calories=Sum('calories'),
                 total_carbs=Sum('carbs'),
                 total_protein=Sum('protein'),
                 total_fat=Sum('fat')
             )
 
+            # 하루 총 섭취량 계산
             daily_totals = FoodIntake.objects.filter(
                 user=request.user,
                 date=date
@@ -129,9 +146,35 @@ class FoodIntakeView(APIView):
                 total_protein=Sum('protein'),
                 total_fat=Sum('fat')
             )
+
+            # 응답 형식 맞추기
+            meal_totals_dict = {meal['meal_time']: {
+                'total_calories': meal['total_calories'],
+                'total_carbs': meal['total_carbs'],
+                'total_protein': meal['total_protein'],
+                'total_fat': meal['total_fat']
+            } for meal in meal_totals}
+
+            # 하루 총 섭취량 추가
+            meal_totals_dict['daily'] = {
+                'total_calories': daily_totals['total_calories'],
+                'total_carbs': daily_totals['total_carbs'],
+                'total_protein': daily_totals['total_protein'],
+                'total_fat': daily_totals['total_fat']
+            }
+
+             # 날짜 추가
+            meal_totals_dict['date'] = date
             
-            return Response({
-                'meal_totals': total_intake,
-                'daily_totals': daily_totals
-            }, status=status.HTTP_200_OK)
+            
+            return Response(meal_totals_dict, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request):
+        # 모든 저장된 식단 데이터를 삭제
+        deleted_count, _ = FoodIntake.objects.filter(user=request.user).delete()
+        
+        if deleted_count > 0:
+            return Response({'message': '모든 식단 데이터가 성공적으로 삭제되었습니다.'}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'error': '삭제할 데이터가 없습니다.'}, status=status.HTTP_404_NOT_FOUND)

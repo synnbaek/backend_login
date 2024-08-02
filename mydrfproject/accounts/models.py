@@ -18,12 +18,7 @@ class CustomUser(AbstractUser):
     required_intake = models.FloatField(null=True, blank=True)  # 권장 섭취량
 
 
-    def calculate_required_intake(self):
-        # 권장 섭취량 계산 로직 (여기서는 단순 예시)
-        # 예: (체중 * 활동 수준) * 10 + 기본 대사율 (일반적으로는 더 복잡한 계산 사용)
-        return (self.weight * self.activity_level) * 10
-
-
+   
     def __str__(self):
         return self.username
 

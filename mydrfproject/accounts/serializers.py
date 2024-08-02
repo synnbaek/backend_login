@@ -10,7 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['name', 'email', 'activity_level', 'height', 'weight', 'username', 'password', 'required_intake']
         extra_kwargs = {
             'password': {'write_only': True},
-            'required_intake': {'read_only': True}  # 회원가입 시에는 입력받지 않음
+            
         }
 
     def create(self, validated_data):
@@ -20,10 +20,11 @@ class UserSerializer(serializers.ModelSerializer):
             name=validated_data['name'],
             activity_level=validated_data['activity_level'],
             height=validated_data['height'],
-            weight=validated_data['weight']
+            weight=validated_data['weight'],
+            required_intake = validated_data['required_intake'],
         )
         user.set_password(validated_data['password'])
-        user.required_intake = user.calculate_required_intake()
+        
         user.save()
         return user
 class FoodIntakeSerializer(serializers.ModelSerializer):
