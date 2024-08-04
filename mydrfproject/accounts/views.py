@@ -106,13 +106,14 @@ def update_required_intake(request):
 
 # views.py
 
-from rest_framework.views import APIView
+from decimal import Decimal, ROUND_HALF_UP
+from django.db.models import Sum
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from .models import FoodIntake
 from .serializers import FoodIntakeSerializer
-from django.db.models import Sum
-from rest_framework.permissions import IsAuthenticated
 
 class FoodIntakeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -147,28 +148,96 @@ class FoodIntakeView(APIView):
                 total_fat=Sum('fat')
             )
 
+            # 소수점 두 자리까지 포맷팅
+            def format_decimal(value):
+                """Decimal 값을 소수점 두 자리까지 포맷팅"""
+                if value is None:
+                    return '0.00'
+                return str(Decimal(value).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP))
+
             # 응답 형식 맞추기
-            meal_totals_dict = {meal['meal_time']: {
-                'total_calories': meal['total_calories'],
-                'total_carbs': meal['total_carbs'],
-                'total_protein': meal['total_protein'],
-                'total_fat': meal['total_fat']
-            } for meal in meal_totals}
+            meal_totals_dict = {
+                meal['meal_time']: {
+                    'total_calories': format_decimal(meal['total_calories']),
+                    'total_carbs': format_decimal(meal['total_carbs']),
+                    'total_protein': format_decimal(meal['total_protein']),
+                    'total_fat': format_decimal(meal['total_fat'])
+                } for meal in meal_totals
+            }
 
             # 하루 총 섭취량 추가
             meal_totals_dict['daily'] = {
-                'total_calories': daily_totals['total_calories'],
-                'total_carbs': daily_totals['total_carbs'],
-                'total_protein': daily_totals['total_protein'],
-                'total_fat': daily_totals['total_fat']
+                'total_calories': format_decimal(daily_totals['total_calories']),
+                'total_carbs': format_decimal(daily_totals['total_carbs']),
+                'total_protein': format_decimal(daily_totals['total_protein']),
+                'total_fat': format_decimal(daily_totals['total_fat'])
             }
 
-             # 날짜 추가
+            # 날짜 추가
             meal_totals_dict['date'] = date
             
-            
             return Response(meal_totals_dict, status=status.HTTP_200_OK)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self, request):
+        # 요청에서 날짜를 가져옵니다
+        date = request.query_params.get('date')
+
+        if not date:
+            return Response({"detail": "Date parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 저장된 식단을 가져옵니다
+        meal_totals = FoodIntake.objects.filter(
+            user=request.user,
+            date=date
+        ).values('meal_time').annotate(
+            total_calories=Sum('calories'),
+            total_carbs=Sum('carbs'),
+            total_protein=Sum('protein'),
+            total_fat=Sum('fat')
+        )
+
+        daily_totals = FoodIntake.objects.filter(
+            user=request.user,
+            date=date
+        ).aggregate(
+            total_calories=Sum('calories'),
+            total_carbs=Sum('carbs'),
+            total_protein=Sum('protein'),
+            total_fat=Sum('fat')
+        )
+
+        # 소수점 두 자리까지 포맷팅
+        def format_decimal(value):
+            
+            if value is None:
+                return '0.00'
+            return str(Decimal(value).quantize(Decimal('0.00'), rounding=ROUND_HALF_UP))
+
+        # 응답 형식 맞추기
+        meal_totals_dict = {
+            meal['meal_time']: {
+                'total_calories': format_decimal(meal['total_calories']),
+                'total_carbs': format_decimal(meal['total_carbs']),
+                'total_protein': format_decimal(meal['total_protein']),
+                'total_fat': format_decimal(meal['total_fat'])
+            } for meal in meal_totals
+        }
+
+        # 하루 총 섭취량 추가
+        meal_totals_dict['daily'] = {
+            'total_calories': format_decimal(daily_totals['total_calories']),
+            'total_carbs': format_decimal(daily_totals['total_carbs']),
+            'total_protein': format_decimal(daily_totals['total_protein']),
+            'total_fat': format_decimal(daily_totals['total_fat'])
+        }
+
+        # 날짜 추가
+        meal_totals_dict['date'] = date
+
+        return Response(meal_totals_dict, status=status.HTTP_200_OK)
+
     
     def delete(self, request):
         # 모든 저장된 식단 데이터를 삭제
